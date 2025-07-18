@@ -214,12 +214,13 @@ $(document).ready(function() {
         var table = $('<table class="table table-hover"/>');
 
         var table_head = $('<thead><tr>' +
-                           '<th data-sort="string">Benchmark</th>' +
-                           '<th data-sort="float">Value</th>' +
-                           '<th data-sort="float">Recent change</th>' +
-                           '<th data-sort="string">Changed at</th>' +
+                           '<th>Benchmark</th>' +
+                           '<th>Value</th>' +
+                           '<th>Recent change</th>' +
+                           '<th>Changed at</th>' +
                            '</tr></thead>');
         table.append(table_head);
+        console.log(data)
 
         var table_body = $('<tbody/>');
 
@@ -254,7 +255,7 @@ $(document).ready(function() {
             var bm_link;
             if (row.idx === null) {
                 bm_link = $('<a/>').attr('href', benchmark_base_url).text(row.pretty_name);
-                name_td.append(bm_link);
+                name_td.append(bm_link).attr('data-filter', row.pretty_name).attr('data-order', row.pretty_name);
             }
             else {
                 var basename = row.pretty_name;
@@ -265,7 +266,7 @@ $(document).ready(function() {
                     args = row.pretty_name.slice(basename.length);
                 }
                 bm_link = $('<a/>').attr('href', benchmark_base_url).text(basename);
-                name_td.append(bm_link);
+                name_td.append(bm_link).attr('data-filter', row.pretty_name).attr('data-order', row.pretty_name);;
                 if (args) {
                     var bm_idx_link;
                     var graph_url;
@@ -301,10 +302,12 @@ $(document).ready(function() {
                 value_span.attr('data-toggle', 'tooltip');
                 value_span.attr('title', value + err_str);
                 value_td.append(value_span);
-                value_td.attr('data-sort-value', sort_value);
+                value_td.attr('data-order', sort_value);
+                value_td.attr('data-filter', value);
             }
             else {
-                value_td.attr('data-sort-value', -1e99);
+                value_td.attr('data-order', -1e99);
+                value_td.attr('data-filter', '');
             }
 
             /* Change percentage column */
@@ -351,14 +354,16 @@ $(document).ready(function() {
                 else if (change < -5) {
                     change_td.addClass('negative-change');
                 }
-                change_td.attr('data-sort-value', sort_value);
+                change_td.attr('data-order', sort_value);
+                change_td.attr('data-filter', text);
             }
             else {
-                change_td.attr('data-sort-value', 0);
+                change_td.attr('data-order', 0);
+                change_td.attr('data-filter', '');
             }
 
             /* Change date column */
-            var changed_at_td = $('<td class="change-date"/>');
+            var changed_at_td = $('<td class="change-date" data-filter="" />');
             if (row.change_rev !== null) {
                 var date = new Date($.asv.main_json.revision_to_date[row.change_rev[1]]);
                 var commit_1 = $.asv.get_commit_hash(row.change_rev[0]);
@@ -381,9 +386,12 @@ $(document).ready(function() {
                     commit_a.attr('href', $.asv.main_json.show_commit_url + commit_2);
                     commit_a.text(commit_2);
                 }
-                span.text($.asv.format_date_yyyymmdd(date) + ' ');
+                var text = $.asv.format_date_yyyymmdd(date) + ' '
+                span.text(text);
                 span.append(commit_a);
                 changed_at_td.append(span);
+                changed_at_td.attr('data-filter', span.text())
+                changed_at_td.attr('data-order', span.text())
             }
 
             tr.append(name_td);
@@ -398,39 +406,36 @@ $(document).ready(function() {
 
         /* Finalize */
         table.append(table_body);
-        setup_sort(table);
+        // Set datatable after page has loaded
+        setTimeout(() => setup_sort(table, data), 0);
 
         return table;
     }
 
-    function setup_sort(table) {
-        var info = $.asv.parse_hash_string(window.location.hash);
-
-        table.stupidtable();
-
-        table.on('aftertablesort', function (event, data) {
-            var info = $.asv.parse_hash_string(window.location.hash);
-            info.params['sort'] = [data.column];
-            info.params['dir'] = [data.direction];
-            window.location.hash = $.asv.format_hash_string(info);
-
-            /* Update appearance */
-            table.find('thead th').removeClass('asc');
-            table.find('thead th').removeClass('desc');
-            var th_to_sort = table.find("thead th").eq(parseInt(data.column));
-            if (th_to_sort) {
-                th_to_sort.addClass(data.direction);
-            }
+    function setup_sort(table, data) {
+        table.dataTable({
+          pageLength: 100,
+          lengthMenu: [25, 50, 100, { label: 'All', value: -1 }],
+          columnDefs: [
+        {targets: [0,3],type: 'string-utf8', searchPanes: {show: true}},
+        {targets: [1,2],type: 'num', searchPanes: {show: true}}, ],
+          layout: {
+              bottomEnd: {
+                  paging: {
+                      firstLast: false
+                  }
+              },
+              // topStart: {
+              //   buttons: ['searchPanes']
+              // },
+          },
+          ordering: {
+            indicators: true,
+            handler: true
+          },
+          searching: true
         });
-
-        if (info.params.sort && info.params.dir) {
-            var th_to_sort = table.find("thead th").eq(parseInt(info.params.sort[0]));
-            th_to_sort.stupidsort(info.params.dir[0]);
-        }
-        else {
-            var th_to_sort = table.find("thead th").eq(0);
-            th_to_sort.stupidsort("asc");
-        }
+        return;
     }
 
     /*
