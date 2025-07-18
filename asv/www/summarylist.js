@@ -220,151 +220,155 @@ $(document).ready(function() {
                            '<th>Changed at</th>' +
                            '</tr></thead>');
         table.append(table_head);
-        console.log(data)
-
         var table_body = $('<tbody/>');
+        table.append(table_body);
 
-        $.each(data, function(row_idx, row) {
-            var tr = $('<tr/>');
-            var name_td = $('<td/>');
-            var name = $('<a/>');
-            var benchmark_url_args = {};
-            var benchmark_full_url;
-            var benchmark_base_url;
+        // Set datatable after page has loaded
+        setTimeout(() => setup_sort(table, data), 0);
 
-            /* Format benchmark url */
-            benchmark_url_args.location = [row.name];
-            benchmark_url_args.params = {};
-            $.each($.asv.main_json.params, function (key, values) {
-                if (values.length > 1) {
+        return table;
+    }
+
+    function setup_sort(table, data) {
+        table.dataTable({
+          data,
+          pageLength: 100,
+          lengthMenu: [25, 50, 100, { label: 'All', value: -1 }],
+          columns: [
+            {
+              data: 'pretty_name',
+              render: (val, type, row) => {
+                if (type !== 'display') return val;
+                let benchmark_url_args = {}
+                benchmark_url_args.location = [row.name];
+                benchmark_url_args.params = {};
+                $.each($.asv.main_json.params, function (key, values) {
+                  if (values.length > 1) {
                     benchmark_url_args.params[key] = [state[key]];
-                }
-            });
-            benchmark_base_url = $.asv.format_hash_string(benchmark_url_args);
-            if (row.idx !== null) {
-                var benchmark = $.asv.main_json.benchmarks[row.name];
-                $.each($.asv.param_selection_from_flat_idx(benchmark.params, row.idx).slice(1),
-                       function(i, param_values) {
-                           benchmark_url_args.params['p-'+benchmark.param_names[i]]
-                               = [benchmark.params[i][param_values[0]]];
-                       });
-            }
-            benchmark_full_url = $.asv.format_hash_string(benchmark_url_args);
-
-            /* Benchmark name column */
-            var bm_link;
-            if (row.idx === null) {
-                bm_link = $('<a/>').attr('href', benchmark_base_url).text(row.pretty_name);
-                name_td.append(bm_link).attr('data-filter', row.pretty_name).attr('data-order', row.pretty_name);
-            }
-            else {
-                var basename = row.pretty_name;
-                var args = null;
-                var m = row.pretty_name.match(/(.*)\(.*$/);
-                if (m) {
+                  }
+                });
+                let benchmark_base_url = $.asv.format_hash_string(benchmark_url_args);
+                let benchmark_full_url = $.asv.format_hash_string(benchmark_url_args);
+                if (row.idx === null) {
+                  return `<a href="${benchmark_base_url}">${val}</a>`
+                } else {
+                  var basename = row.pretty_name;
+                  var args = null;
+                  var m = row.pretty_name.match(/(.*)\(.*$/);
+                  if (m) {
                     basename = m[1];
                     args = row.pretty_name.slice(basename.length);
-                }
-                bm_link = $('<a/>').attr('href', benchmark_base_url).text(basename);
-                name_td.append(bm_link).attr('data-filter', row.pretty_name).attr('data-order', row.pretty_name);;
-                if (args) {
+                  }
+                  let bm_link = $('<a/>').attr('href', benchmark_base_url).text(basename);
+                  let name_td = $('<td/>');
+                  name_td.append(bm_link).attr('data-filter', row.pretty_name).attr('data-order', row.pretty_name);;
+                  if (args) {
                     var bm_idx_link;
                     var graph_url;
                     bm_idx_link = $('<a/>').attr('href', benchmark_full_url).text(' ' + args);
                     name_td.append(bm_idx_link);
                     graph_url = $.asv.graph_to_path(row.name, state);
                     $.asv.ui.hover_graph(bm_idx_link, graph_url, row.name, row.idx, null);
+                  }
+                  return name_td[0].innerHTML
                 }
-            }
-            $.asv.ui.hover_summary_graph(bm_link, row.name);
+              },
+              createdCell: (td_tag, text, row, rowIndex, colIndex, ...args) => {
+                if (td_tag.children[0])
+                  $.asv.ui.hover_summary_graph($(td_tag.children[0]), row.name);
+                if (td_tag.children[1]) {
+                  let graph_url = $.asv.graph_to_path(row.name, state);
+                  $.asv.ui.hover_graph($(td_tag.children[1]), graph_url, row.name, row.idx, null);
+                }
+              }
+            },
+            {
+              data: 'last_value', render: (text, type, row) => {
+                if (type !== 'display') return text;
+                let unit = $.asv.main_json.benchmarks[row.name].unit;
+                let value = $.asv.pretty_unit(row.last_value, unit);
 
-            /* Value column */
-            var value_td = $('<td class="value"/>');
-            if (row.last_value !== null) {
-                var value, err, err_str, sort_value;
-                var unit = $.asv.main_json.benchmarks[row.name].unit;
-                value = $.asv.pretty_unit(row.last_value, unit);
-                if (unit == "seconds") {
-                    sort_value = row.last_value * 1e100;
-                }
-                else {
-                    sort_value = row.last_value;
-                }
-                var value_span = $('<span/>').text(value);
-
-                err = 100*row.last_err/row.last_value;
+                let err = 100 * row.last_err / row.last_value;
+                let err_str
                 if (err == err) {
-                    err_str = " \u00b1 " + err.toFixed(0.1) + '%';
+                  err_str = " \u00b1 " + err.toFixed(0.1) + '%';
                 }
                 else {
-                    err_str = "";
+                  err_str = "";
                 }
+
+                var value_span = $('<span/>').text(value + err_str);
                 value_span.attr('data-toggle', 'tooltip');
                 value_span.attr('title', value + err_str);
-                value_td.append(value_span);
-                value_td.attr('data-order', sort_value);
-                value_td.attr('data-filter', value);
-            }
-            else {
-                value_td.attr('data-order', -1e99);
-                value_td.attr('data-filter', '');
-            }
-
-            /* Change percentage column */
-            var change_td = $('<td class="change"/>');
-            if (row.prev_value !== null) {
-                var text, change_str, change = 0, sort_value = 0;
-                var unit = $.asv.main_json.benchmarks[row.name].unit;
-                change_str = $.asv.pretty_unit(row.last_value - row.prev_value, unit);
-                if (!change_str.match(/^-/)) {
-                    change_str = '+' + change_str;
+                return value_span[0].outerHTML
+              },
+              createdCell: (td_tag, text, row, rowIndex, colIndex) => {
+                $(td_tag).find('[data-toggle=tooltip]').tooltip()
+                td_tag.classList.add('value')
+              }
+            },
+            {
+              data: 'prev_value',
+              render: (_text, type, row) => {
+                let change = 0;
+                if (row.prev_value) {
+                  change = 100 * (row.last_value / row.prev_value - 1);
                 }
-                if (row.prev_value != 0) {
-                    change = 100 * (row.last_value / row.prev_value - 1);
+                if (type === 'sort') return change || 0;
+                let benchmark_url_args = { location: [row.name], params: {} }
+                $.each($.asv.main_json.params, function (key, values) {
+                  if (values.length > 1) {
+                    benchmark_url_args.params[key] = [state[key]];
+                  }
+                });
+                let benchmark_full_url = $.asv.format_hash_string(benchmark_url_args);
+                if (row.prev_value !== null) {
+                  let text, change_str;
+                  let unit = $.asv.main_json.benchmarks[row.name].unit;
+                  change_str = $.asv.pretty_unit(row.last_value - row.prev_value, unit);
+                  if (!change_str.match(/^-/)) {
+                    change_str = '+' + change_str;
+                  }
+                  if (row.prev_value != 0) {
                     text = change.toFixed(1) + '%  (' + change_str + ')';
                     if (change > 0) {
-                        text = '+' + text;
+                      text = '+' + text;
                     }
-                    sort_value = change;
-                }
-                else {
+                  }
+                  else {
                     text = ' (' + change_str + ')';
+                  }
+                  text = text.replace('-', '\u2212');
+                  if (type === 'filter') return text
+
+                  let change_commit_a = $.asv.main_json.revision_to_hash[row.change_rev[0]];
+                  let change_commit_b = $.asv.main_json.revision_to_hash[row.change_rev[1]];
+                  let change_q = '&commits=' + [change_commit_a, change_commit_b].filter(Boolean).join('-');
+                  let change_link = $('<a/>').attr('href', benchmark_full_url + change_q).text(text);
+                  return change_link[0].outerHTML
                 }
-                text = text.replace('-', '\u2212');
-
-                var change_commit_a = $.asv.main_json.revision_to_hash[row.change_rev[0]];
-                var change_commit_b = $.asv.main_json.revision_to_hash[row.change_rev[1]];
-                var change_q;
-                if (change_commit_a === undefined) {
-                    change_q = '&commits=' + change_commit_b;
+                return ''
+              },
+              createdCell: (td_tag, text, row, rowIndex, colIndex) => {
+                let graph_url = $.asv.graph_to_path(row.name, state);
+                $.asv.ui.hover_graph($(td_tag.children[0]), graph_url, row.name, row.idx, [row.change_rev]);
+                let change = 0;
+                if (row.prev_value) {
+                  change = 100 * (row.last_value / row.prev_value - 1);
                 }
-                else {
-                    change_q = '&commits=' + change_commit_a + '-' + change_commit_b;
-                }
-                var change_link = $('<a/>').attr('href', benchmark_full_url + change_q).text(text);
-
-                graph_url = $.asv.graph_to_path(row.name, state);
-                $.asv.ui.hover_graph(change_link, graph_url, row.name, row.idx, [row.change_rev]);
-
-                change_td.append(change_link);
-
                 if (change > 5) {
-                    change_td.addClass('positive-change');
+                  td_tag.classList.add('positive-change')
+                } else if (change < -5) {
+                  td_tag.classList.add('negative-change')
                 }
-                else if (change < -5) {
-                    change_td.addClass('negative-change');
-                }
-                change_td.attr('data-order', sort_value);
-                change_td.attr('data-filter', text);
-            }
-            else {
-                change_td.attr('data-order', 0);
-                change_td.attr('data-filter', '');
-            }
-
-            /* Change date column */
-            var changed_at_td = $('<td class="change-date" data-filter="" />');
-            if (row.change_rev !== null) {
+                td_tag.classList.add('change')
+              }
+            },
+            {
+              data: 'change_rev.0',
+              render: (text, type, row) => {
+                if (type !== 'display') return text;
+                if (row.change_rev === null) return '';
                 var date = new Date($.asv.main_json.revision_to_date[row.change_rev[1]]);
                 var commit_1 = $.asv.get_commit_hash(row.change_rev[0]);
                 var commit_2 = $.asv.get_commit_hash(row.change_rev[1]);
@@ -389,49 +393,24 @@ $(document).ready(function() {
                 var text = $.asv.format_date_yyyymmdd(date) + ' '
                 span.text(text);
                 span.append(commit_a);
-                changed_at_td.append(span);
-                changed_at_td.attr('data-filter', span.text())
-                changed_at_td.attr('data-order', span.text())
-            }
-
-            tr.append(name_td);
-            tr.append(value_td);
-            tr.append(change_td);
-            tr.append(changed_at_td);
-
-            table_body.append(tr);
-        });
-
-        table_body.find('[data-toggle="tooltip"]').tooltip();
-
-        /* Finalize */
-        table.append(table_body);
-        // Set datatable after page has loaded
-        setTimeout(() => setup_sort(table, data), 0);
-
-        return table;
-    }
-
-    function setup_sort(table, data) {
-        table.dataTable({
-          pageLength: 100,
-          lengthMenu: [25, 50, 100, { label: 'All', value: -1 }],
-          columnDefs: [
-        {targets: [0,3],type: 'string-utf8', searchPanes: {show: true}},
-        {targets: [1,2],type: 'num', searchPanes: {show: true}}, ],
-          layout: {
-              bottomEnd: {
-                  paging: {
-                      firstLast: false
-                  }
+                return span[0].outerHTML
               },
-              // topStart: {
-              //   buttons: ['searchPanes']
-              // },
+              createdCell: (td_tag, text, row, rowIndex, colIndex) => {
+                td_tag.classList.add('change-date')
+              }
+            },
+          ],
+          columnControl: ['order', ['search', 'searchList']],
+          layout: {
+            bottomEnd: {
+              paging: {
+                firstLast: false
+              }
+            },
           },
           ordering: {
-            indicators: true,
-            handler: true
+            indicators: false,
+            handler: false
           },
           searching: true
         });
