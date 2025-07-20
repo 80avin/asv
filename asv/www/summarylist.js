@@ -367,7 +367,6 @@ $(document).ready(function() {
             {
               data: 'change_rev.0',
               render: (text, type, row) => {
-                if (type !== 'display') return text;
                 if (row.change_rev === null) return '';
                 var date = new Date($.asv.main_json.revision_to_date[row.change_rev[1]]);
                 var commit_1 = $.asv.get_commit_hash(row.change_rev[0]);
@@ -393,6 +392,7 @@ $(document).ready(function() {
                 var text = $.asv.format_date_yyyymmdd(date) + ' '
                 span.text(text);
                 span.append(commit_a);
+                if (type !== 'display') return span.text();
                 return span[0].outerHTML
               },
               createdCell: (td_tag, text, row, rowIndex, colIndex) => {
