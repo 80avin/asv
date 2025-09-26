@@ -1,5 +1,6 @@
 import asyncio
 import os
+import sys
 from pathlib import Path
 
 from yaml import load
@@ -9,7 +10,7 @@ try:
 except ImportError:
     from yaml import Loader
 
-from rattler import VirtualPackage, install, solve
+from rattler import ChannelPriority, MatchSpec, VirtualPackage, install, solve
 
 from .. import environment, util
 from ..console import log
@@ -61,11 +62,34 @@ class Rattler(environment.Environment):
                     f"Environment file {conf.conda_environment_file} not found, ignoring"
                 )
 
-        super(Rattler, self).__init__(conf, python, requirements, tagged_env_vars)
+        super().__init__(conf, python, requirements, tagged_env_vars)
         # Rattler configuration things
         self._pkg_cache = f"{self._env_dir}/pkgs"
 
-        # TODO(haozeke): Provide channel priority, see mamba
+        self._channel_priority = ChannelPriority.Strict
+        condarc_path = Path(os.getenv("CONDARC", ""))
+        if condarc_path.is_file() and os.getenv("ASV_USE_CONDARC"):
+            log.debug(f"Loading environment configuration from {condarc_path}")
+            with condarc_path.open() as f:
+                condarc_data = load(f, Loader=Loader) or {}
+
+            if "channels" in condarc_data:
+                self._channels = condarc_data["channels"] + self._channels
+
+            if "channel_priority" in condarc_data:
+                priority_str = condarc_data["channel_priority"]
+                priority_map = {
+                    "strict": ChannelPriority.Strict,
+                    "flexible": ChannelPriority.Flexible,
+                    "disabled": ChannelPriority.Disabled,
+                }
+                if priority_str in priority_map:
+                    self._channel_priority = priority_map[priority_str]
+                    log.debug(f"Set channel priority to {priority_str}")
+                else:
+                    log.warning(
+                        f"Unknown channel_priority '{priority_str}' in .condarc"
+                    )
 
     def _setup(self):
         asyncio.run(self._async_setup())
@@ -96,14 +120,39 @@ class Rattler(environment.Environment):
                 except KeyError:
                     raise KeyError("Only pip is supported as a secondary key")
         _pkgs += _args
-        _pkgs = [util.replace_python_version(pkg, self._python) for pkg in _pkgs]
+        _pkgs = [util.replace_cpython_version(pkg, self._python) for pkg in _pkgs]
+        specs = [MatchSpec(p) for p in _pkgs]
+        if hasattr(VirtualPackage, "current"):
+            virtual_packages = VirtualPackage.current()
+        else:
+            virtual_packages = VirtualPackage.detect()
+
+        # Expand the 'defaults' meta-channel as rattler requires concrete
+        # channel URLs.
+        expanded_channels = []
+        for channel in self._channels:
+            if channel == "defaults":
+                log.debug("Expanding 'defaults' meta-channel")
+                expanded_channels.extend(
+                    [
+                        "https://repo.anaconda.com/pkgs/main",
+                        "https://repo.anaconda.com/pkgs/r",
+                    ]
+                )
+                if sys.platform.startswith("win"):
+                    expanded_channels.append("https://repo.anaconda.com/pkgs/msys2")
+            else:
+                expanded_channels.append(channel)
+        final_channels = list(dict.fromkeys(expanded_channels).keys())
+
         solved_records = await solve(
             # Channels to use for solving
-            channels=self._channels,
+            channels=final_channels,
             # The specs to solve for
-            specs=_pkgs,
+            specs=specs,
             # Virtual packages define the specifications of the environment
-            virtual_packages=VirtualPackage.detect(),
+            virtual_packages=virtual_packages,
+            channel_priority=self._channel_priority,
         )
         await install(records=solved_records, target_prefix=self._path)
         if pip_args:
@@ -128,7 +177,7 @@ class Rattler(environment.Environment):
         return _args, pip_args
 
     def run_executable(self, executable, args, **kwargs):
-        return super(Rattler, self).run_executable(executable, args, **kwargs)
+        return super().run_executable(executable, args, **kwargs)
 
     def run(self, args, **kwargs):
         log.debug(f"Running '{' '.join(args)}' in {self.name}")

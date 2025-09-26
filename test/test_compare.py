@@ -49,7 +49,7 @@ All benchmarks:
 | +        | 1.00s                | 3.00s               | 3.00    | time_with_version_match                       |
 | +        | 1.00s                | 3.00s               | 3.00    | time_with_version_mismatch_bench              |
 | x        | 1.00s                | 3.00s               | 3.00    | time_with_version_mismatch_other              |
-"""  # noqa: E501 line too long
+"""
 
 REFERENCE_SPLIT = """
 Benchmarks that have improved:
@@ -95,7 +95,7 @@ Benchmarks that are not comparable:
 | Change   | Before [22b920c6]    | After [fcf8c079]    |   Ratio | Benchmark (Parameter)            |
 |----------|----------------------|---------------------|---------|----------------------------------|
 | x        | 1.00s                | 3.00s               |       3 | time_with_version_mismatch_other |
-"""  # noqa: E501 line too long
+"""
 
 REFERENCE_ONLY_CHANGED = """
 | Change   | Before [22b920c6] <name1>   | After [fcf8c079] <name2>   | Ratio   | Benchmark (Parameter)                        |
@@ -112,7 +112,7 @@ REFERENCE_ONLY_CHANGED = """
 | +        | 1.00s                       | 3.00s                      | 3.00    | time_with_version_mismatch_bench             |
 | +        | 934μs                       | 108ms                      | 115.90  | time_quantity.time_quantity_init_array       |
 | -        | 69.1μs                      | 18.3μs                     | 0.27    | time_units.time_unit_to                      |
-"""  # noqa: E501 line too long
+"""
 
 REFERENCE_ONLY_CHANGED_MULTIENV = """
 | Change   | Before [22b920c6]    | After [fcf8c079]    | Ratio   | Benchmark (Parameter)                                                 |
@@ -129,7 +129,7 @@ REFERENCE_ONLY_CHANGED_MULTIENV = """
 | +        | 1.00s                | 3.00s               | 3.00    | time_with_version_mismatch_bench [cheetah/py2.7-numpy1.8]             |
 | +        | 934μs                | 108ms               | 115.90  | time_quantity.time_quantity_init_array [cheetah/py2.7-numpy1.8]       |
 | -        | 69.1μs               | 18.3μs              | 0.27    | time_units.time_unit_to [cheetah/py2.7-numpy1.8]                      |
-"""  # noqa: E501 line too long
+"""
 
 REFERENCE_ONLY_CHANGED_NOSTATS = """
 | Change   | Before [22b920c6]    | After [fcf8c079]    | Ratio   | Benchmark (Parameter)                        |
@@ -147,7 +147,38 @@ REFERENCE_ONLY_CHANGED_NOSTATS = """
 | +        | 1.00s                | 3.00s               | 3.00    | time_with_version_mismatch_bench             |
 | +        | 934μs                | 108ms               | 115.90  | time_quantity.time_quantity_init_array       |
 | -        | 69.1μs               | 18.3μs              | 0.27    | time_units.time_unit_to                      |
-"""  # noqa: E501 line too long
+"""
+
+REFERENCE_FIXED_FAIL = """
+All benchmarks:
+
+| Change   | Before [22b920c6]    | After [fcf8c079]    | Ratio   | Benchmark (Parameter)                         |
+|----------|----------------------|---------------------|---------|-----------------------------------------------|
+| !        | n/a                  | failed              | n/a     | params_examples.ParamSuite.track_value        |
+| *        | failed               | 1.00s               | n/a     | time_AAA_failure                              |
+|          | n/a                  | n/a                 | n/a     | time_AAA_skip                                 |
+|          | 1.00±1s              | 3.00±1s             | ~3.00   | time_ci_big                                   |
+| +        | 1.00±0s              | 3.00±0s             | 3.00    | time_ci_small                                 |
+| !        | 454μs                | failed              | n/a     | time_coordinates.time_latitude                |
+|          | 1.00s                | 1.00s               | 1.00    | time_other.time_parameterized(1)              |
+|          | 2.00s                | 4.00s               | 2.00    | time_other.time_parameterized(2)              |
+| !        | 3.00s                | failed              | n/a     | time_other.time_parameterized(3)              |
+| +        | 1.75ms               | 153ms               | 87.28   | time_quantity.time_quantity_array_conversion  |
+| +        | 934μs                | 108ms               | 115.90  | time_quantity.time_quantity_init_array        |
+|          | 83.6μs               | 55.4μs              | 0.66    | time_quantity.time_quantity_init_scalar       |
+|          | 282μs                | 147μs               | 0.52    | time_quantity.time_quantity_scalar_conversion |
+| +        | 1.31ms               | 7.75ms              | 5.91    | time_quantity.time_quantity_ufunc_sin         |
+|          | 42                   | 42                  | 1.00    | time_secondary.track_value                    |
+|          | 5.73m                | 5.73m               | 1.00    | time_units.mem_unit                           |
+| +        | 125μs                | 3.81ms              | 30.42   | time_units.time_simple_unit_parse             |
+|          | 1.64ms               | 1.53ms              | 0.93    | time_units.time_unit_compose                  |
+| +        | 372μs                | 11.5ms              | 30.81   | time_units.time_unit_parse                    |
+| -        | 69.1μs               | 18.3μs              | 0.27    | time_units.time_unit_to                       |
+|          | 11.9μs               | 13.1μs              | 1.10    | time_units.time_very_simple_unit_parse        |
+| +        | 1.00s                | 3.00s               | 3.00    | time_with_version_match                       |
+| +        | 1.00s                | 3.00s               | 3.00    | time_with_version_mismatch_bench              |
+| x        | 1.00s                | 3.00s               | 3.00    | time_with_version_mismatch_other              |
+"""
 
 
 def test_compare(capsys, tmpdir, example_results):
@@ -155,27 +186,53 @@ def test_compare(capsys, tmpdir, example_results):
     os.chdir(tmpdir)
 
     conf = config.Config.from_json(
-        {'results_dir': example_results,
-         'repo': tools.generate_test_repo(tmpdir).path,
-         'project': 'asv',
-         'environment_type': "shouldn't matter what"})
+        {
+            'results_dir': example_results,
+            'repo': tools.generate_test_repo(tmpdir).path,
+            'project': 'asv',
+            'environment_type': "shouldn't matter what",
+        }
+    )
 
-    tools.run_asv_with_conf(conf, 'compare', '22b920c6', 'fcf8c079', '--machine=cheetah',
-                            '--factor=2', '--environment=py2.7-numpy1.8')
+    tools.run_asv_with_conf(
+        conf,
+        'compare',
+        '22b920c6',
+        'fcf8c079',
+        '--machine=cheetah',
+        '--factor=2',
+        '--environment=py2.7-numpy1.8',
+    )
 
     text, err = capsys.readouterr()
     assert text.strip() == REFERENCE.strip()
 
-    tools.run_asv_with_conf(conf, 'compare', '22b920c6', 'fcf8c079', '--machine=cheetah',
-                            '--factor=2', '--split', '--environment=py2.7-numpy1.8')
+    tools.run_asv_with_conf(
+        conf,
+        'compare',
+        '22b920c6',
+        'fcf8c079',
+        '--machine=cheetah',
+        '--factor=2',
+        '--split',
+        '--environment=py2.7-numpy1.8',
+    )
     text, err = capsys.readouterr()
     assert text.strip() == REFERENCE_SPLIT.strip()
 
     # Check print_table output as called from Continuous
-    status = Compare.print_table(conf, '22b920c6', 'fcf8c079', factor=2, machine='cheetah',
-                                 split=False, only_changed=True, sort='ratio',
-                                 env_names=["py2.7-numpy1.8"],
-                                 commit_names={'22b920c6': 'name1', 'fcf8c079': 'name2'})
+    status = Compare.print_table(
+        conf,
+        '22b920c6',
+        'fcf8c079',
+        factor=2,
+        machine='cheetah',
+        split=False,
+        only_changed=True,
+        sort='ratio',
+        env_names=["py2.7-numpy1.8"],
+        commit_names={'22b920c6': 'name1', 'fcf8c079': 'name2'},
+    )
     worsened, improved = status
     assert worsened
     assert improved
@@ -185,25 +242,44 @@ def test_compare(capsys, tmpdir, example_results):
     assert text.strip() == REFERENCE_ONLY_CHANGED.strip()
 
     # Check table with multiple environments
-    status = Compare.print_table(conf, '22b920c6', 'fcf8c079', factor=2, machine='cheetah',
-                                 split=False, only_changed=True, sort='ratio')
+    status = Compare.print_table(
+        conf,
+        '22b920c6',
+        'fcf8c079',
+        factor=2,
+        machine='cheetah',
+        split=False,
+        only_changed=True,
+        sort='ratio',
+    )
     text, err = capsys.readouterr()
     assert text.strip() == REFERENCE_ONLY_CHANGED_MULTIENV.strip()
 
     # Check results with no stats
-    tools.run_asv_with_conf(conf, 'compare', '22b920c6', 'fcf8c079', '--machine=cheetah',
-                            '--factor=2', '--sort=ratio', '--environment=py2.7-numpy1.8',
-                            '--no-stats', '--only-changed')
+    tools.run_asv_with_conf(
+        conf,
+        'compare',
+        '22b920c6',
+        'fcf8c079',
+        '--machine=cheetah',
+        '--factor=2',
+        '--sort=ratio',
+        '--environment=py2.7-numpy1.8',
+        '--no-stats',
+        '--only-changed',
+    )
     text, err = capsys.readouterr()
     assert text.strip() == REFERENCE_ONLY_CHANGED_NOSTATS.strip()
     assert "time_ci_big" in text.strip()
 
 
-@pytest.mark.parametrize("dvcs_type", [
-    "git",
-    pytest.param("hg", marks=pytest.mark.skipif(hglib is None or WIN,
-                                                reason="needs hglib"))
-])
+@pytest.mark.parametrize(
+    "dvcs_type",
+    [
+        "git",
+        pytest.param("hg", marks=pytest.mark.skipif(hglib is None or WIN, reason="needs hglib")),
+    ],
+)
 def test_compare_name_lookup(dvcs_type, capsys, tmpdir, example_results):
     tmpdir = str(tmpdir)
     os.chdir(tmpdir)
@@ -222,8 +298,10 @@ def test_compare_name_lookup(dvcs_type, capsys, tmpdir, example_results):
     for fn in ['feea15ca-py2.7-Cython-numpy1.8.json', 'machine.json']:
         shutil.copyfile(os.path.join(src, fn), os.path.join(dst, fn))
 
-    shutil.copyfile(os.path.join(example_results, 'benchmarks.json'),
-                    os.path.join(result_dir, 'benchmarks.json'))
+    shutil.copyfile(
+        os.path.join(example_results, 'benchmarks.json'),
+        os.path.join(result_dir, 'benchmarks.json'),
+    )
 
     # Copy to different commit
     fn_1 = os.path.join(dst, 'feea15ca-py2.7-Cython-numpy1.8.json')
@@ -233,16 +311,75 @@ def test_compare_name_lookup(dvcs_type, capsys, tmpdir, example_results):
     util.write_json(fn_2, data)
 
     conf = config.Config.from_json(
-        {'results_dir': result_dir,
-         'repo': repo.path,
-         'project': 'asv',
-         'environment_type': "shouldn't matter what"})
+        {
+            'results_dir': result_dir,
+            'repo': repo.path,
+            'project': 'asv',
+            'environment_type': "shouldn't matter what",
+        }
+    )
 
     # Lookup with symbolic name
-    tools.run_asv_with_conf(conf, 'compare', branch_name, 'feea15ca', '--machine=cheetah',
-                            '--factor=2', '--environment=py2.7-Cython-numpy1.8',
-                            '--only-changed')
+    tools.run_asv_with_conf(
+        conf,
+        'compare',
+        branch_name,
+        'feea15ca',
+        '--machine=cheetah',
+        '--factor=2',
+        '--environment=py2.7-Cython-numpy1.8',
+        '--only-changed',
+    )
 
     # Nothing should be printed since no results were changed
     text, err = capsys.readouterr()
     assert text.strip() == ''
+
+
+def test_compare_fixed_failures(capsys, tmpdir, example_results):
+    tmpdir = str(tmpdir)
+    os.chdir(tmpdir)
+    before_short_hash = '22b920c6'
+    after_short_hash = 'fcf8c079'
+    env_spec = 'py2.7-Cython-numpy1.8'
+    before_filename = f"{before_short_hash}-{env_spec}.json"
+    after_filename = f"{after_short_hash}-{env_spec}.json"
+    results_dir_fixed = join(tmpdir, "results_fixed")
+    machine_dir = join(results_dir_fixed, 'cheetah')
+    os.makedirs(machine_dir)
+    # Don't need modification
+    shutil.copyfile(
+        join(example_results, 'benchmarks.json'), join(results_dir_fixed, 'benchmarks.json')
+    )
+    shutil.copyfile(
+        join(example_results, 'cheetah', 'machine.json'), join(machine_dir, 'machine.json')
+    )
+    shutil.copyfile(
+        join(example_results, 'cheetah', before_filename), join(machine_dir, before_filename)
+    )
+    # Load the 'after' result file, modify it, and save to the new location
+    after_path = join(example_results, 'cheetah', after_filename)
+    data = util.load_json(after_path)
+    # Change the result of time_AAA_failure from failed (null) to a successful run with value 1.0
+    data['results']['time_AAA_failure'] = [[1.0], []]
+    new_after_path = join(machine_dir, after_filename)
+    util.write_json(new_after_path, data)
+    conf = config.Config.from_json(
+        {
+            'results_dir': results_dir_fixed,
+            'repo': tools.generate_test_repo(tmpdir).path,
+            'project': 'asv',
+            'environment_type': "shouldn't matter what",
+        }
+    )
+    tools.run_asv_with_conf(
+        conf,
+        'compare',
+        before_short_hash,
+        after_short_hash,
+        '--machine=cheetah',
+        '--factor=2',
+        '--environment=py2.7-numpy1.8',
+    )
+    text, err = capsys.readouterr()
+    assert text.strip() == REFERENCE_FIXED_FAIL.strip()

@@ -55,7 +55,7 @@ do, and there is also a :ref:`conf-reference` with more details.  The
 values that will most likely need to be changed for any benchmarking
 suite are:
 
-- ``version``: Version of the `asv.conf.json` spec. As of `v0.6.4`, there is only version `1`.
+- ``version``: Version of the ``asv.conf.json`` spec. As of ``v0.6.4``, there is only version ``1``.
 
 - ``project``: The Python package name of the project being benchmarked.
 
@@ -80,8 +80,8 @@ suite are:
   ``https://github.com/$OWNER/$REPO/commit/``.
 
 - ``environment_type``: The tool used to create environments.  May be
-  ``conda`` or ``virtualenv`` or ``mamba``.  If Conda supports the
-  dependencies you need, that is the recommended method. Mamba is faster
+  ``conda`` or ``virtualenv`` or ``rattler``.  If Conda supports the
+  dependencies you need, that is the recommended method. Rattler is faster
   but needs a newer Python version (3.8 or greater).
   See :ref:`environments` for more information.
 
@@ -188,9 +188,8 @@ the benchmarks are run, things will start much faster.
 Environments can be created using different tools.  By default,
 ``asv`` ships with support for `anaconda
 <https://store.continuum.io/cshop/anaconda/>`__,
-`mamba <https://mamba.readthedocs.io/en/latest/index.html/>`__, and
-`virtualenv <https://pypi.python.org/pypi/virtualenv>`__, though plugins may be
-installed to support other environment tools.  The
+`rattler <https://conda.github.io/rattler/py-rattler/>`__, and
+`virtualenv <https://pypi.python.org/pypi/virtualenv>`__.  The
 ``environment_type`` key in ``asv.conf.json`` is used to select the
 tool used to create environments.
 
@@ -403,7 +402,7 @@ The keys may be one of:
 - environment-related: a name of a dependency, e.g. ``numpy``
 
 The values are glob patterns, as supported by the Python standard
-library module `fnmatch`.  So, for example, to remove all benchmarks
+library module ``fnmatch``.  So, for example, to remove all benchmarks
 in the ``time_units`` module::
 
     asv rm "benchmark=time_units.*"
@@ -479,8 +478,8 @@ Running a benchmark in the profiler
 slower, but it can't really tell you *why* it got slower.  That's
 where a profiler comes in.  **airspeed velocity** has features to
 easily run a given benchmark in the Python standard library's
-`cProfile` profiler, and then open the profiling data in the tool of
-your choice.
+``cProfile`` profiler, and then open the profiling data in the tool
+of your choice.
 
 The ``asv profile`` command profiles a given benchmark on a given
 revision of the project.
@@ -640,7 +639,7 @@ each of its symbolic states can be understood as:
      - Introduced a failure
      - Failed
      - Succeeded
-   * -
+   * - ``*``
      - Green
      - Fixed failure
      - Succeeded

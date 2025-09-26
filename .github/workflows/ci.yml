@@ -15,7 +15,7 @@ jobs:
       matrix:
         # macos-latest doesn't have 3.8 anymore
         os: ["ubuntu-latest", "macos-13"]
-        python-version: ["3.8", "3.12", "pypy-3.10"]
+        python-version: ["3.8", "3.12", "pypy-3.11"]
         # TODO - Set 'r-version' to "release" to use latest R version once the compatibility between R and rpy2 is fixed.
         # See: https://github.com/airspeed-velocity/asv/actions/runs/14904829763/job/41864696603?pr=1485
         # Also see https://github.com/rpy2/rpy2/issues/1164 and https://github.com/r-lib/actions
@@ -37,8 +37,8 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew update
-          brew install mercurial
           brew install --cask anaconda
+          pip install mercurial
 
       - name: Set up Python version ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -51,17 +51,17 @@ jobs:
         uses: browser-actions/setup-chrome@latest
 
       - name: Set up R version ${{ matrix.r-version }}
-        uses: r-lib/actions/setup-r@v2.11.1
+        uses: r-lib/actions/setup-r@v2.11.3
         with:
           r-version: ${{ matrix.r-version }}
 
       - name: Install dependencies (standard)
         if: matrix.python-version != '3.12.0-rc.2'
-        run: python -m pip install ".[test,hg,testR]"
+        run: python -m pip install ".[test,hg,testR,envs]"
 
       - name: Install dependencies (with --pre)
         if: matrix.python-version == '3.12.0-rc.2'
-        run: python -m pip install ".[test,hg,testR]" --pre
+        run: python -m pip install ".[test,hg,testR,envs]" --pre
 
       - name: Install asv
         run: pip install .
@@ -82,7 +82,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: mamba-org/setup-micromamba@v2.0.1
+      - uses: mamba-org/setup-micromamba@v2.0.4
         with:
           init-shell: >-
             bash
@@ -91,11 +91,11 @@ jobs:
           create-args: >-
             python
             pip
-            libmambapy<2.0
+            py_rattler
             conda-build
 
       - name: Install dependencies
-        run: python -m pip install ".[test,hg]" --pre
+        run: python -m pip install ".[test,hg,envs]" --pre
         shell: micromamba-shell {0}
 
       - name: Install asv

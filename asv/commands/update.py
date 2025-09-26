@@ -16,10 +16,10 @@ class Update(Command):
     @classmethod
     def setup_arguments(cls, subparsers):
         parser = subparsers.add_parser(
-            "update", help="Update the results and config files "
-            "to the current version",
-            description="Update the results and config files "
-            "to the current version")
+            "update",
+            help="Update the results and config files to the current version",
+            description="Update the results and config files to the current version",
+        )
 
         parser.set_defaults(func=cls.run_from_args)
 
@@ -51,7 +51,9 @@ class Update(Command):
                         continue
 
                     # Rename files if necessary
-                    m = re.match(r'^([0-9a-f]+)-(.*)\.json$', os.path.basename(path), re.I)
+                    m = re.match(
+                        r'^([0-9a-f]+)-(.*)\.json$', os.path.basename(path), re.IGNORECASE
+                    )
                     if m:
                         new_path = get_filename(root, m.group(1), m.group(2))
                         if new_path != path:

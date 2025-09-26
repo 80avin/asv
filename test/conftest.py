@@ -35,6 +35,7 @@ except ImportError:
 
 try:
     from asv import _rangemedian
+
     HAVE_RANGEMEDIAN = True
 except ImportError:
     HAVE_RANGEMEDIAN = False
@@ -47,25 +48,31 @@ DUMMY_VALUES = (
 
 
 def pytest_addoption(parser):
-    parser.addoption("--webdriver", action="store", default="None",
-                     help=("Selenium WebDriver interface to use for running the test. "
-                           "Choices: None, PhantomJS, Chrome, Firefox, ChromeHeadless, "
-                           "FirefoxHeadless. Alternatively, it can be arbitrary Python code "
-                           "with a return statement with selenium.webdriver object, for "
-                           "example 'return Chrome()'"))
     parser.addoption(
-        "--runflaky", action="store_true", default=False, help="run flaky tests"
+        "--webdriver",
+        action="store",
+        default="None",
+        help=(
+            "Selenium WebDriver interface to use for running the test. "
+            "Choices: None, PhantomJS, Chrome, Firefox, ChromeHeadless, "
+            "FirefoxHeadless. Alternatively, it can be arbitrary Python code "
+            "with a return statement with selenium.webdriver object, for "
+            "example 'return Chrome()'"
+        ),
     )
-    parser.addoption("--environment-type", action="store", default=None,
-                     choices=("conda", "virtualenv", "mamba"),
-                     help="environment_type to use in tests by default")
+    parser.addoption("--runflaky", action="store_true", default=False, help="run flaky tests")
+    parser.addoption(
+        "--environment-type",
+        action="store",
+        default="virtualenv",
+        choices=("conda", "virtualenv", "rattler"),
+        help="environment_type to use in tests by default",
+    )
 
 
-def generate_basic_conf(tmpdir,
-                        repo_subdir='',
-                        values=DUMMY_VALUES,
-                        dummy_packages=True,
-                        conf_version=1):
+def generate_basic_conf(
+    tmpdir, repo_subdir='', values=DUMMY_VALUES, dummy_packages=True, conf_version=1
+):
     # conf_version allows to generate different configurations with this same function
     assert conf_version in (1, 2)
     tmpdir = str(tmpdir)
@@ -79,12 +86,11 @@ def generate_basic_conf(tmpdir,
 
     machine_file = join(tmpdir, 'asv-machine.json')
 
-    shutil.copyfile(join(local, 'asv-machine.json'),
-                    machine_file)
+    shutil.copyfile(join(local, 'asv-machine.json'), machine_file)
 
     # values not in test_dev.py copy
-    repo_path = tools.generate_test_repo(tmpdir, values,
-                                         subdir=repo_subdir).path
+    repo_path = tools.generate_test_repo(tmpdir, values, subdir=repo_subdir).path
+    global env_type
 
     conf_dict = {
         'env_dir': 'env',
@@ -92,19 +98,21 @@ def generate_basic_conf(tmpdir,
         'results_dir': 'results_workflow',
         'html_dir': 'html',
         'repo': relpath(repo_path),
+        'environment_type': env_type,
         'project': 'asv',
+        'conda_channels': ["conda-forge"],
         'dvcs': 'git',
         'matrix': {
-            "asv-dummy-test-package-1": [None],
-            "asv-dummy-test-package-2": tools.DUMMY2_VERSIONS,
+            "pip+asv-dummy-test-package-1": [None],
+            "pip+asv-dummy-test-package-2": tools.DUMMY2_VERSIONS,
         },
     }
     if not dummy_packages:
         conf_dict['matrix'] = {}
     elif conf_version == 2:
         conf_dict['matrix'] = {
-            "asv_dummy_test_package_1": [""],
-            "asv_dummy_test_package_2": tools.DUMMY2_VERSIONS,
+            "pip+asv_dummy_test_package_1": [""],
+            "pip+asv_dummy_test_package_2": tools.DUMMY2_VERSIONS,
         }
     if repo_subdir:
         conf_dict['repo_subdir'] = repo_subdir
@@ -112,7 +120,7 @@ def generate_basic_conf(tmpdir,
     conf = config.Config.from_json(conf_dict)
 
     if hasattr(sys, 'pypy_version_info'):
-        conf.pythons = ["pypy{0[0]}.{0[1]}".format(sys.version_info)]
+        conf.pythons = [f"pypy{sys.version_info[0]}.{sys.version_info[1]}"]
 
     return tmpdir, local, conf, machine_file
 
@@ -121,13 +129,15 @@ def pytest_sessionstart(session):
     _monkeypatch_conda_lock(session.config)
 
     # Unregister unwanted environment types
+    # XXX: Ugly hack to get the variable into generate_basic_conf
+    global env_type
     env_type = session.config.getoption('environment_type')
     if env_type is not None:
         import asv.environment
         import asv.util
 
         for cls in asv.util.iter_subclasses(asv.environment.Environment):
-            cls.matches_python_fallback = (cls.tool_name in (env_type, "existing"))
+            cls.matches_python_fallback = cls.tool_name in (env_type, "existing")
 
 
 def _monkeypatch_conda_lock(config):
@@ -146,10 +156,12 @@ def _monkeypatch_conda_lock(config):
     asv.plugins.conda._conda_lock = _conda_lock
 
 
-@pytest.fixture(params=[
-    "git",
-    pytest.param("hg", marks=pytest.mark.skipif(hglib is None, reason="needs hglib")),
-])
+@pytest.fixture(
+    params=[
+        "git",
+        pytest.param("hg", marks=pytest.mark.skipif(hglib is None, reason="needs hglib")),
+    ]
+)
 def two_branch_repo_case(request, tmpdir):
     r"""
     This test ensure we follow the first parent in case of merges
@@ -179,20 +191,24 @@ def two_branch_repo_case(request, tmpdir):
         master = f"{util.git_default_branch()}"
     elif dvcs_type == "hg":
         master = "default"
-    dvcs = tools.generate_repo_from_ops(tmpdir, dvcs_type, [
-        ("commit", 1),
-        ("checkout", "stable", master),
-        ("commit", 2),
-        ("checkout", master),
-        ("commit", 3),
-        ("merge", "stable"),
-        ("commit", 4),
-        ("checkout", "stable"),
-        ("merge", master, "Merge master"),
-        ("commit", 5),
-        ("checkout", master),
-        ("commit", 6),
-    ])
+    dvcs = tools.generate_repo_from_ops(
+        tmpdir,
+        dvcs_type,
+        [
+            ("commit", 1),
+            ("checkout", "stable", master),
+            ("commit", 2),
+            ("checkout", master),
+            ("commit", 3),
+            ("merge", "stable"),
+            ("commit", 4),
+            ("checkout", "stable"),
+            ("merge", master, "Merge master"),
+            ("commit", 5),
+            ("checkout", master),
+            ("commit", 6),
+        ],
+    )
 
     conf = config.Config()
     conf.branches = [master, "stable"]
@@ -241,9 +257,7 @@ def example_results(request):
         shutil.copyfile(src_machine, dst_machine)
 
         # Convert to current file format
-        conf = config.Config.from_json({'results_dir': dst,
-                                        'repo': 'none',
-                                        'project': 'asv'})
+        conf = config.Config.from_json({'results_dir': dst, 'repo': 'none', 'project': 'asv'})
         run_asv_with_conf(conf, 'update', _machine_file=dst_machine)
 
         return dst
@@ -293,6 +307,7 @@ def browser(request, pytestconfig):
     # Clean up on fixture finalization
     def fin():
         browser.quit()
+
     request.addfinalizer(fin)
 
     # Set default time to wait for AJAX requests to complete
@@ -353,7 +368,7 @@ def basic_html(request):
 
 
 @pytest.fixture
-def benchmarks_fixture(tmpdir):
+def benchmarks_fixture(tmpdir, request: pytest.FixtureRequest):
     tmpdir = str(tmpdir)
     os.chdir(tmpdir)
 
@@ -363,6 +378,8 @@ def benchmarks_fixture(tmpdir):
     d.update(ASV_CONF_JSON)
     d['env_dir'] = "env"
     d['benchmark_dir'] = 'benchmark'
+    d['environment_type'] = request.config.getoption('environment_type')
+    d['conda_channels'] = ["conda-forge"]
     d['repo'] = tools.generate_test_repo(tmpdir, [0]).path
     d['branches'] = ["master"]
     conf = config.Config.from_json(d)
@@ -374,17 +391,20 @@ def benchmarks_fixture(tmpdir):
     return conf, repo, envs, commit_hash
 
 
-@pytest.fixture(params=[
-    "git",
-    pytest.param("hg", marks=pytest.mark.skipif(hglib is None, reason="needs hglib")),
-])
+@pytest.fixture(
+    params=[
+        "git",
+        pytest.param("hg", marks=pytest.mark.skipif(hglib is None, reason="needs hglib")),
+    ]
+)
 def generate_result_dir(request, tmpdir):
     tmpdir = str(tmpdir)
     dvcs_type = request.param
 
     def _generate_result_dir(values, commits_without_result=None):
         dvcs = tools.generate_repo_from_ops(
-            tmpdir, dvcs_type, [("commit", i) for i in range(len(values))])
+            tmpdir, dvcs_type, [("commit", i) for i in range(len(values))]
+        )
         commits = list(reversed(dvcs.get_branch_hashes()))
         commit_values = {}
         commits_without_result = [commits[i] for i in commits_without_result or []]
@@ -394,6 +414,7 @@ def generate_result_dir(request, tmpdir):
         conf = tools.generate_result_dir(tmpdir, dvcs, commit_values)
         repo = get_repo(conf)
         return conf, repo, commits
+
     return _generate_result_dir
 
 
@@ -403,20 +424,28 @@ def show_fixture(tmpdir, example_results):
     os.chdir(tmpdir)
 
     conf = config.Config.from_json(
-        {'results_dir': example_results,
-         'repo': tools.generate_test_repo(tmpdir).path,
-         'project': 'asv',
-         'environment_type': "shouldn't matter what"})
+        {
+            'results_dir': example_results,
+            'repo': tools.generate_test_repo(tmpdir).path,
+            'project': 'asv',
+            'environment_type': "shouldn't matter what",
+        }
+    )
 
     return conf
 
 
-@pytest.fixture(params=[
-    "python",
-    pytest.param("rangemedian",
-                 marks=pytest.mark.skipif(not HAVE_RANGEMEDIAN,
-                                          reason="compiled asv._rangemedian required"))
-])
+@pytest.fixture(
+    params=[
+        "python",
+        pytest.param(
+            "rangemedian",
+            marks=pytest.mark.skipif(
+                not HAVE_RANGEMEDIAN, reason="compiled asv._rangemedian required"
+            ),
+        ),
+    ]
+)
 def use_rangemedian(request):
     if request.param == "rangemedian":
         assert isinstance(step_detect.get_mu_dist([0], [1]), _rangemedian.RangeMedian)
@@ -427,14 +456,15 @@ def use_rangemedian(request):
         def restore():
             if HAVE_RANGEMEDIAN:
                 step_detect._rangemedian = _rangemedian
+
         request.addfinalizer(restore)
 
         assert isinstance(step_detect.get_mu_dist([0], [1]), L1Dist)
         return False
 
+
 def pytest_configure(config):
-    config.addinivalue_line("markers",
-        "flaky_pypy: Tests that are flaky on pypy.")
+    config.addinivalue_line("markers", "flaky_pypy: Tests that are flaky on pypy.")
 
 
 def pytest_collection_modifyitems(config, items):
@@ -445,3 +475,15 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if "flaky" in item.keywords:
             item.add_marker(skip_flaky)
+
+
+@pytest.fixture
+def skip_virtualenv(request: pytest.FixtureRequest):
+    if request.config.getoption('environment_type') == 'virtualenv':
+        pytest.skip('Cannot run this test with virtualenv')
+
+
+@pytest.fixture
+def skip_no_conda(request: pytest.FixtureRequest):
+    if request.config.getoption('environment_type') != 'conda':
+        pytest.skip('Needs to be run with conda')

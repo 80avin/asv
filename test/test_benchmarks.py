@@ -16,62 +16,70 @@ from . import tools
 
 BENCHMARK_DIR = join(dirname(__file__), 'benchmark')
 
-INVALID_BENCHMARK_DIR = join(
-    dirname(__file__), 'benchmark.invalid')
+INVALID_BENCHMARK_DIR = join(dirname(__file__), 'benchmark.invalid')
 
-ASV_CONF_JSON = {
-    'project': 'asv'
-}
+ASV_CONF_JSON = {'project': 'asv'}
 
 if util.ON_PYPY:
-    ASV_CONF_JSON['pythons'] = ["pypy{0[0]}.{0[1]}".format(sys.version_info)]
+    ASV_CONF_JSON['pythons'] = [f"pypy{sys.version_info[0]}.{sys.version_info[1]}"]
 
 
 def test_discover_benchmarks(benchmarks_fixture):
     conf, repo, envs, commit_hash = benchmarks_fixture
 
-    b = benchmarks.Benchmarks.discover(conf, repo, envs, [commit_hash],
-                                       regex='secondary')
+    b = benchmarks.Benchmarks.discover(conf, repo, envs, [commit_hash], regex='secondary')
     assert len(b) == 6
 
     old_branches = conf.branches
-    conf.branches = [f"{util.git_default_branch()}",
-                     "some-missing-branch"]  # missing branches ignored
-    b = benchmarks.Benchmarks.discover(conf, repo, envs, [commit_hash],
-                                       regex='example')
+    conf.branches = [
+        f"{util.git_default_branch()}",
+        "some-missing-branch",
+    ]  # missing branches ignored
+    b = benchmarks.Benchmarks.discover(conf, repo, envs, [commit_hash], regex='example')
     conf.branches = old_branches
     if util.ON_PYPY:
         assert len(b) == 34
     else:
         assert len(b) == 36
 
-    b = benchmarks.Benchmarks.discover(conf, repo, envs, [commit_hash],
-                                       regex='time_example_benchmark_1')
+    b = benchmarks.Benchmarks.discover(
+        conf, repo, envs, [commit_hash], regex='time_example_benchmark_1'
+    )
     assert len(b) == 2
 
-    b = benchmarks.Benchmarks.discover(conf, repo, envs, [commit_hash],
-                                       regex=['time_example_benchmark_1',
-                                       'some regexp that does not match anything'])
+    b = benchmarks.Benchmarks.discover(
+        conf,
+        repo,
+        envs,
+        [commit_hash],
+        regex=['time_example_benchmark_1', 'some regexp that does not match anything'],
+    )
     assert len(b) == 2
 
     b = benchmarks.Benchmarks.discover(conf, repo, envs, [commit_hash], regex='custom')
-    assert sorted(b.keys()) == ['custom.time_function', 'custom.track_method',
-                                'named.track_custom_pretty_name']
+    assert sorted(b.keys()) == [
+        'custom.time_function',
+        'custom.track_method',
+        'named.track_custom_pretty_name',
+    ]
     assert 'pretty_name' not in b['custom.track_method']
     assert b['custom.time_function']['pretty_name'] == 'My Custom Function'
     assert b['named.track_custom_pretty_name']['pretty_name'] == 'this.is/the.answer'
 
     # benchmark param selection with regex
-    b = benchmarks.Benchmarks.discover(conf, repo, envs, [commit_hash],
-                                       regex=r'track_param_selection\(.*, 3\)')
+    b = benchmarks.Benchmarks.discover(
+        conf, repo, envs, [commit_hash], regex=r'track_param_selection\(.*, 3\)'
+    )
     assert list(b.keys()) == ['params_examples.track_param_selection']
     assert b._benchmark_selection['params_examples.track_param_selection'] == [0, 2]
-    b = benchmarks.Benchmarks.discover(conf, repo, envs, [commit_hash],
-                                       regex=r'track_param_selection\(1, ')
+    b = benchmarks.Benchmarks.discover(
+        conf, repo, envs, [commit_hash], regex=r'track_param_selection\(1, '
+    )
     assert list(b.keys()) == ['params_examples.track_param_selection']
     assert b._benchmark_selection['params_examples.track_param_selection'] == [0, 1]
-    b = benchmarks.Benchmarks.discover(conf, repo, envs, [commit_hash],
-                                       regex='track_param_selection')
+    b = benchmarks.Benchmarks.discover(
+        conf, repo, envs, [commit_hash], regex='track_param_selection'
+    )
     assert list(b.keys()) == ['params_examples.track_param_selection']
     assert b._benchmark_selection['params_examples.track_param_selection'] == [0, 1, 2, 3]
 
@@ -96,7 +104,7 @@ def test_discover_benchmarks(benchmarks_fixture):
     assert b['timeraw_examples.TimerawSuite.timeraw_setup']['number'] == 1
 
 
-def test_invalid_benchmark_tree(tmpdir):
+def test_invalid_benchmark_tree(tmpdir, request: pytest.FixtureRequest):
     tmpdir = str(tmpdir)
     os.chdir(tmpdir)
 
@@ -104,6 +112,8 @@ def test_invalid_benchmark_tree(tmpdir):
     d.update(ASV_CONF_JSON)
     d['benchmark_dir'] = INVALID_BENCHMARK_DIR
     d['env_dir'] = "env"
+    d['environment_type'] = request.config.getoption('environment_type')
+    d['conda_channels'] = ["conda-forge"]
     d['repo'] = tools.generate_test_repo(tmpdir, [0]).path
     conf = config.Config.from_json(d)
 
@@ -115,7 +125,7 @@ def test_invalid_benchmark_tree(tmpdir):
         benchmarks.Benchmarks.discover(conf, repo, envs, [commit_hash])
 
 
-def test_find_benchmarks_cwd_imports(tmpdir):
+def test_find_benchmarks_cwd_imports(tmpdir, request: pytest.FixtureRequest):
     # Test that files in the directory above the benchmark suite are
     # not importable
 
@@ -144,6 +154,8 @@ def track_this():
     d = {}
     d.update(ASV_CONF_JSON)
     d['env_dir'] = "env"
+    d['environment_type'] = request.config.getoption('environment_type')
+    d['conda_channels'] = ["conda-forge"]
     d['benchmark_dir'] = 'benchmark'
     d['repo'] = tools.generate_test_repo(tmpdir, [[0, 1]]).path
     conf = config.Config.from_json(d)
@@ -152,12 +164,11 @@ def track_this():
     envs = list(environment.get_environments(conf, None))
     commit_hash = repo.get_hash_from_name(repo.get_branch_name())
 
-    b = benchmarks.Benchmarks.discover(conf, repo, envs, [commit_hash],
-                                       regex='track_this')
+    b = benchmarks.Benchmarks.discover(conf, repo, envs, [commit_hash], regex='track_this')
     assert len(b) == 1
 
 
-def test_import_failure_retry(tmpdir):
+def test_import_failure_retry(tmpdir, request: pytest.FixtureRequest):
     # Test that a different commit is tried on import failure
 
     tmpdir = str(tmpdir)
@@ -165,7 +176,8 @@ def test_import_failure_retry(tmpdir):
 
     os.makedirs('benchmark')
     with open(os.path.join('benchmark', '__init__.py'), 'w') as f:
-        f.write(textwrap.dedent("""
+        f.write(
+            textwrap.dedent("""
         import asv_test_repo
 
         def time_foo():
@@ -175,7 +187,8 @@ def test_import_failure_retry(tmpdir):
 
         if asv_test_repo.dummy_value == 0:
             raise RuntimeError("fail discovery")
-        """))
+        """)
+        )
 
     dvcs = tools.generate_test_repo(tmpdir, [2, 1, 0])
 
@@ -183,6 +196,8 @@ def test_import_failure_retry(tmpdir):
     d.update(ASV_CONF_JSON)
     d['env_dir'] = "env"
     d['benchmark_dir'] = 'benchmark'
+    d['environment_type'] = request.config.getoption('environment_type')
+    d['conda_channels'] = ["conda-forge"]
     d['repo'] = dvcs.path
     conf = config.Config.from_json(d)
 
@@ -195,7 +210,7 @@ def test_import_failure_retry(tmpdir):
     assert b['time_foo']['number'] == 1
 
 
-def test_conf_inside_benchmarks_dir(tmpdir):
+def test_conf_inside_benchmarks_dir(tmpdir, request: pytest.FixtureRequest):
     # Test that the configuration file can be inside the benchmark suite
 
     tmpdir = str(tmpdir)
@@ -212,6 +227,8 @@ def test_conf_inside_benchmarks_dir(tmpdir):
     d = {}
     d.update(ASV_CONF_JSON)
     d['env_dir'] = "env"
+    d['environment_type'] = request.config.getoption('environment_type')
+    d['conda_channels'] = ["conda-forge"]
     d['benchmark_dir'] = '.'
     d['repo'] = tools.generate_test_repo(tmpdir, [[0, 1]]).path
     conf = config.Config.from_json(d)
@@ -223,12 +240,11 @@ def test_conf_inside_benchmarks_dir(tmpdir):
     envs = list(environment.get_environments(conf, None))
     commit_hash = repo.get_hash_from_name(repo.get_branch_name())
 
-    b = benchmarks.Benchmarks.discover(conf, repo, envs, [commit_hash],
-                                       regex='track_this')
+    b = benchmarks.Benchmarks.discover(conf, repo, envs, [commit_hash], regex='track_this')
     assert set(b.keys()) == {'track_this', 'bench.track_this'}
 
 
-def test_code_extraction(tmpdir):
+def test_code_extraction(tmpdir, request: pytest.FixtureRequest):
     tmpdir = str(tmpdir)
     os.chdir(tmpdir)
 
@@ -238,6 +254,8 @@ def test_code_extraction(tmpdir):
     d.update(ASV_CONF_JSON)
     d['env_dir'] = "env"
     d['benchmark_dir'] = 'benchmark'
+    d['environment_type'] = request.config.getoption('environment_type')
+    d['conda_channels'] = ["conda-forge"]
     d['repo'] = tools.generate_test_repo(tmpdir, [0]).path
     conf = config.Config.from_json(d)
 
@@ -245,8 +263,9 @@ def test_code_extraction(tmpdir):
     envs = list(environment.get_environments(conf, None))
     commit_hash = repo.get_hash_from_name(repo.get_branch_name())
 
-    b = benchmarks.Benchmarks.discover(conf, repo, envs, [commit_hash],
-                                       regex=r'^code_extraction\.')
+    b = benchmarks.Benchmarks.discover(
+        conf, repo, envs, [commit_hash], regex=r'^code_extraction\.'
+    )
 
     expected_code = textwrap.dedent("""
     def track_test():
@@ -314,7 +333,7 @@ def test_code_extraction(tmpdir):
 
 def test_asv_benchmark_timings():
     # Check the benchmark runner runs
-    util.check_call([sys.executable, '-masv.benchmark', 'timing',
-                     '--setup=import time',
-                     'time.sleep(0)'],
-                    cwd=os.path.join(os.path.dirname(__file__), '..'))
+    util.check_call(
+        [sys.executable, '-masv.benchmark', 'timing', '--setup=import time', 'time.sleep(0)'],
+        cwd=os.path.join(os.path.dirname(__file__), '..'),
+    )

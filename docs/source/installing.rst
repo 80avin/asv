@@ -28,9 +28,8 @@ installed automatically, for example due to networking restrictions, the
 
 For managing the environments, one of the following packages is required:
 
-- `libmambapy <https://mamba.readthedocs.io/en/latest/python_api.html>`__,
-  which is typically part of ``mamba``. In this case ``conda`` and ``conda-build``
-  must be present too.
+- `py-rattler <https://conda.github.io/rattler/py-rattler/>`__, which is used
+  for the new ``rattler`` backend.
 
 - `virtualenv <https://virtualenv.pypa.io/>`__, which is required since
   venv is not compatible with other versions of Python.
@@ -41,7 +40,7 @@ For managing the environments, one of the following packages is required:
 
 .. note::
 
-   ``libmambapy`` is the fastest for situations where non-pythonic
+   ``rattler`` is the fastest for situations where non-pythonic
    dependencies are required. Anaconda or miniconda is slower but
    still preferred if the project involves a lot of compiled C/C++
    extensions and are available in the ``conda`` repository, since

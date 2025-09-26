@@ -2,12 +2,18 @@
 
 import importlib
 import pkgutil
+import re
 import sys
 
 from . import commands, plugins
 from .console import log
 
-ENV_PLUGINS = [".mamba", ".virtualenv", ".conda", ".rattler"]
+ENV_PLUGIN_REGEXES = [
+    r"\.virtualenv$",
+    r"\.conda$",
+    r"\.rattler$",
+]
+
 
 class PluginManager:
     """
@@ -31,7 +37,7 @@ class PluginManager:
                 self.init_plugin(mod)
                 self._plugins.append(mod)
             except ModuleNotFoundError as err:
-                if any(keyword in name for keyword in ENV_PLUGINS):
+                if any(re.search(regex, name) for regex in ENV_PLUGIN_REGEXES):
                     continue  # Fine to not have these
                 else:
                     log.error(f"Couldn't load {name} because\n{err}")
